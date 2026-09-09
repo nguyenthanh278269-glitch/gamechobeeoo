@@ -59,9 +59,12 @@
 
         .card { height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.3s ease; cursor: pointer; will-change: transform; }
         .card.flipped, .card.matched { transform: rotateY(180deg); }
-        .card.matched { cursor: default; }
         .card.wrong { animation: shake 0.3s; }
         
+        /* Hiệu ứng khi thẻ Tiếng Anh đã ghép đúng được nhấp lại để nghe âm thanh */
+        .card.matched[data-type="EN"] { cursor: pointer; }
+        .card.matched[data-type="EN"]:active { transform: rotateY(180deg) scale(0.95); }
+
         .face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px; text-align: center; border: 1px solid rgba(255,255,255,0.1); }
         .front { background: var(--card-front); font-size: 1.1rem; color: #64748b; }
         .front::after { content: '?'; }
@@ -76,7 +79,11 @@
         .type { font-size: 0.5rem; opacity: 0.75; text-transform: uppercase; }
         .text { font-size: clamp(0.65rem, 2.5vw, 0.9rem); font-weight: bold; line-height: 1.1; }
 
-        /* Nút loa phát âm */
+        /* Nút loa hiển thị trên thẻ Tiếng Anh sau khi đã ghép đúng */
+        .speaker-icon {
+            display: inline-block; margin-top: 2px; font-size: 0.7rem; color: #fef08a;
+        }
+
         .speaker-btn {
             display: inline-flex; align-items: center; justify-content: center;
             margin-top: 3px; padding: 2px 6px; background: rgba(255, 255, 255, 0.2);
@@ -143,16 +150,14 @@
             o.start(); o.stop(snd.currentTime + dur);
         }
 
-        // Hàm phát âm ưu tiên giọng David (Web Speech API) và tự động fallback sang Online TTS (đảm bảo 100% thiết bị chạy giọng David)
+        // Phát âm giọng David cho mọi thiết bị
         function speakWord(word) {
-            // Lựa chọn 1: Sử dụng ResponsiveVoice API (Giọng US English Male / David)
             if (typeof responsiveVoice !== 'undefined') {
                 responsiveVoice.cancel();
                 responsiveVoice.speak(word, "US English Male", { rate: 0.85, pitch: 0.95 });
                 return;
             }
 
-            // Lựa chọn 2: Sử dụng Web Speech API có sẵn trên trình duyệt
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(word);
@@ -162,9 +167,7 @@
 
                 const voices = window.speechSynthesis.getVoices();
                 const davidVoice = voices.find(v => v.name.includes('David'));
-                if (davidVoice) {
-                    utterance.voice = davidVoice;
-                }
+                if (davidVoice) utterance.voice = davidVoice;
 
                 window.speechSynthesis.speak(utterance);
             }
@@ -334,7 +337,15 @@
             }
 
             flip(el, data) {
-                if (this.lock || el.classList.contains('flipped') || el.classList.contains('matched')) return;
+                // Nếu thẻ đã matched và là thẻ Tiếng Anh => Phát âm từ
+                if (el.classList.contains('matched')) {
+                    if (data.type === 'EN') {
+                        speakWord(data.text);
+                    }
+                    return;
+                }
+
+                if (this.lock || el.classList.contains('flipped')) return;
                 el.classList.add('flipped'); playSnd(400);
                 this.flipped.push({el, data});
 
@@ -345,15 +356,29 @@
 
                     if (isMatch) {
                         setTimeout(() => {
-                            c1.el.querySelector('.back').innerHTML = `<div class="type">${c1.data.type}</div><div class="text" style="color:#fef08a">${c1.data.text}<br><small style="font-size:0.55rem; color:#a7f3d0;">Bé giỏi quá ⭐</small></div>`;
-                            c2.el.querySelector('.back').innerHTML = `<div class="type">${c2.data.type}</div><div class="text" style="color:#fef08a">${c2.data.text}<br><small style="font-size:0.55rem; color:#a7f3d0;">Bé giỏi quá ⭐</small></div>`;
+                            // Cập nhật nội dung hiển thị sau khi ghép đúng
+                            const enCard = c1.data.type === 'EN' ? c1 : c2;
+                            const viCard = c1.data.type === 'VI' ? c1 : c2;
+
+                            enCard.el.querySelector('.back').innerHTML = `
+                                <div class="type">ENGLISH</div>
+                                <div class="text" style="color:#fef08a">${enCard.data.text}</div>
+                                <div class="speaker-icon">🔊 Chạm nghe</div>`;
+
+                            viCard.el.querySelector('.back').innerHTML = `
+                                <div class="type">TIẾNG VIỆT</div>
+                                <div class="text" style="color:#fef08a">${viCard.data.text}</div>
+                                <small style="font-size:0.55rem; color:#a7f3d0;">Bé giỏi quá ⭐</small>`;
 
                             c1.el.classList.add('matched'); 
                             c2.el.classList.add('matched');
-                            playSnd(600, 'triangle', 0.2);
+                            
+                            // Tự động phát âm từ tiếng Anh ngay khi lật đúng Cặp
+                            speakWord(enCard.data.text);
+
                             this.matched++; this.dom.score.textContent = `${this.matched}/12`;
                             this.flipped = []; this.lock = false;
-                            if (this.matched === 12) this.win();
+                            if (this.matched === 12) setTimeout(() => this.win(), 800);
                         }, 300);
                     } else {
                         setTimeout(() => { c1.el.classList.add('wrong'); c2.el.classList.add('wrong'); playSnd(150, 'sawtooth', 0.2); }, 200);
@@ -379,6 +404,7 @@
                 this.cardsData.forEach(pair => {
                     const enEl = document.createElement('div');
                     enEl.className = 'card flipped matched';
+                    enEl.setAttribute('data-type', 'EN');
                     enEl.style.cursor = 'pointer';
                     enEl.innerHTML = `
                         <div class="face back">
@@ -391,6 +417,7 @@
 
                     const viEl = document.createElement('div');
                     viEl.className = 'card flipped matched';
+                    viEl.setAttribute('data-type', 'VI');
                     viEl.innerHTML = `
                         <div class="face back">
                             <div class="type">TIẾNG VIỆT</div>
