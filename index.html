@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Game Lật Thẻ Từ Vựng Anh - Việt </title>
+    <title>Game Lật Thẻ Từ Vựng Anh - Việt</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         :root { --bg: #0f172a; --card-front: #1e293b; --card-back: #4f46e5; --card-match: #059669; --card-wrong: #dc2626; }
@@ -74,6 +74,15 @@
         .type { font-size: 0.5rem; opacity: 0.75; text-transform: uppercase; }
         .text { font-size: clamp(0.65rem, 2.5vw, 0.9rem); font-weight: bold; line-height: 1.1; }
 
+        /* Nút loa phát âm Tiếng Anh ở chế độ xem lại */
+        .speaker-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            margin-top: 3px; padding: 2px 6px; background: rgba(255, 255, 255, 0.2);
+            border-radius: 12px; font-size: 0.7rem; cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+        .speaker-btn:active { transform: scale(0.9); background: rgba(255, 255, 255, 0.4); }
+
         @keyframes shake { 0%,100%{transform:rotateY(180deg) translateX(0)} 25%{transform:rotateY(180deg) translateX(-4px)} 75%{transform:rotateY(180deg) translateX(4px)} }
 
         /* Modal chiến thắng */
@@ -133,23 +142,34 @@
             o.start(); o.stop(snd.currentTime + dur);
         }
 
+        // Hàm phát âm từ vựng Tiếng Anh
+        function speakWord(word) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel(); // Dừng câu đọc trước nếu có
+                const utterance = new SpeechSynthesisUtterance(word);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.85; // Tốc độ đọc vừa phải cho bé nghe rõ
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
         class Game {
             constructor() {
                 // Tích hợp sẵn 10 màn chơi trực tiếp từ Dễ đến Khó
                 this.levels = {
                     1: [ // Trái cây
                         {"en": "Apple", "vi": "Táo"},
-    {"en": "Banana", "vi": "Chuối"},
-    {"en": "Orange", "vi": "Cam"},
-    {"en": "Grape", "vi": "Nho"},
-    {"en": "Watermelon", "vi": "Dưa hấu"},
-    {"en": "Mango", "vi": "Xoài"},
-    {"en": "Strawberry", "vi": "Dâu tây"},
-    {"en": "Pineapple", "vi": "Dứa / Thơm"},
-    {"en": "Peach", "vi": "Đào"},
-    {"en": "Coconut", "vi": "Dừa"},
-    {"en": "Cherry", "vi": "Anh đào"},
-    {"en": "Papaya", "vi": "Đu đủ"}
+                        {"en": "Banana", "vi": "Chuối"},
+                        {"en": "Orange", "vi": "Cam"},
+                        {"en": "Grape", "vi": "Nho"},
+                        {"en": "Watermelon", "vi": "Dưa hấu"},
+                        {"en": "Mango", "vi": "Xoài"},
+                        {"en": "Strawberry", "vi": "Dâu tây"},
+                        {"en": "Pineapple", "vi": "Dứa / Thơm"},
+                        {"en": "Peach", "vi": "Đào"},
+                        {"en": "Coconut", "vi": "Dừa"},
+                        {"en": "Cherry", "vi": "Anh đào"},
+                        {"en": "Papaya", "vi": "Đu đủ"}
                     ],
                     2: [ // Màu sắc
                         {en:'Red',vi:'Đỏ'},{en:'Blue',vi:'Xanh dương'},{en:'Green',vi:'Xanh lá'},{en:'Yellow',vi:'Vàng'},
@@ -216,7 +236,7 @@
                 document.getElementById('excel-file').onchange = (e) => this.readExcel(e);
                 document.getElementById('reset-btn').onclick = () => this.start(this.curLvl);
                 
-                // Nút ✔️ (Tích) qua màn tiếp theo (VD: từ Màn 1 -> Màn 2)
+                // Nút ✔️ (Tích) qua màn tiếp theo
                 document.getElementById('btn-continue').onclick = () => {
                     this.dom.modal.classList.remove('active');
                     const nextLvl = this.levels[this.curLvl + 1] ? this.curLvl + 1 : 1;
@@ -347,18 +367,34 @@
                 this.dom.modal.classList.add('active');
             }
 
+            // Hiển thị 2 cột xem lại và thêm nút Loa phát âm ở cột Tiếng Anh
             arrangeReviewMode() {
                 this.dom.board.classList.add('review-mode');
                 this.dom.board.innerHTML = '';
 
                 this.cardsData.forEach(pair => {
+                    // Thẻ Tiếng Anh (Có nút loa 🔊)
                     const enEl = document.createElement('div');
                     enEl.className = 'card flipped matched';
-                    enEl.innerHTML = `<div class="face back"><div class="type">ENGLISH</div><div class="text">${pair.en}</div></div>`;
+                    enEl.style.cursor = 'pointer';
+                    enEl.innerHTML = `
+                        <div class="face back">
+                            <div class="type">ENGLISH</div>
+                            <div class="text">${pair.en}</div>
+                            <div class="speaker-btn" title="Nghe phát âm">🔊 Nghe</div>
+                        </div>`;
                     
+                    // Bấm vào nút loa hoặc toàn bộ thẻ Anh để phát âm
+                    enEl.onclick = () => speakWord(pair.en);
+
+                    // Thẻ Tiếng Việt
                     const viEl = document.createElement('div');
                     viEl.className = 'card flipped matched';
-                    viEl.innerHTML = `<div class="face back"><div class="type">TIẾNG VIỆT</div><div class="text">${pair.vi}</div></div>`;
+                    viEl.innerHTML = `
+                        <div class="face back">
+                            <div class="type">TIẾNG VIỆT</div>
+                            <div class="text">${pair.vi}</div>
+                        </div>`;
 
                     this.dom.board.appendChild(enEl);
                     this.dom.board.appendChild(viEl);
