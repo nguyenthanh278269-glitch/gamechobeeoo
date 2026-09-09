@@ -93,9 +93,9 @@
         .modal-actions { display: flex; justify-content: center; gap: 15px; margin-top: 15px; }
         .action-btn { width: 46px; height: 46px; border-radius: 50%; border: none; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }
         .action-btn:hover { transform: scale(1.1); }
-        .btn-close { background: #ef4444; color: white; } /* Nút X xem lại 2 cột */
-        .btn-replay { background: #f59e0b; color: white; } /* Nút Replay chơi lại màn cũ */
-        .btn-next { background: #10b981; color: white; }  /* Nút Tích qua màn mới */
+        .btn-close { background: #ef4444; color: white; }
+        .btn-replay { background: #f59e0b; color: white; }
+        .btn-next { background: #10b981; color: white; }
     </style>
 </head>
 <body>
@@ -117,7 +117,6 @@
 
     <div class="game-board" id="board"></div>
 
-    <!-- Modal chiến thắng có 3 nút: X (xem lại 2 cột), ↺ (chơi lại màn này), ✔️ (qua màn tiếp) -->
     <div class="modal" id="modal">
         <div class="modal-box">
             <h2 style="color:#fbbf24; margin-bottom:6px;">🎉 BÉ XUẤT SẮC CỰC!</h2>
@@ -142,76 +141,96 @@
             o.start(); o.stop(snd.currentTime + dur);
         }
 
-        // Hàm phát âm từ vựng Tiếng Anh
+        // Tải danh sách giọng đọc sẵn có từ trình duyệt
+        let maleVoice = null;
+        function loadMaleVoice() {
+            if ('speechSynthesis' in window) {
+                const voices = window.speechSynthesis.getVoices();
+                // Tìm kiếm giọng nam (Male) tiếng Anh từ hệ thống
+                maleVoice = voices.find(v => v.lang.startsWith('en') && 
+                    (v.name.includes('Male') || v.name.includes('David') || v.name.includes('Mark') || v.name.includes('George') || v.name.includes('Guy') || v.name.includes('James'))
+                );
+                // Nếu không lọc được theo tên, chọn giọng Tiếng Anh bất kỳ
+                if (!maleVoice) {
+                    maleVoice = voices.find(v => v.lang.startsWith('en'));
+                }
+            }
+        }
+
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = loadMaleVoice;
+            loadMaleVoice();
+        }
+
+        // Hàm phát âm chỉ sử dụng GIỌNG NAM
         function speakWord(word) {
             if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel(); // Dừng câu đọc trước nếu có
+                window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(word);
                 utterance.lang = 'en-US';
-                utterance.rate = 0.85; // Tốc độ đọc vừa phải cho bé nghe rõ
+                utterance.rate = 0.85; // Tốc độ đọc
+                
+                if (maleVoice) {
+                    utterance.voice = maleVoice;
+                }
+                
+                // Chỉnh độ trầm (pitch) xuống 0.75 để đảm bảo âm thanh chuẩn giọng nam trầm hơn
+                utterance.pitch = 0.75; 
+
                 window.speechSynthesis.speak(utterance);
             }
         }
 
         class Game {
             constructor() {
-                // Tích hợp sẵn 10 màn chơi trực tiếp từ Dễ đến Khó
                 this.levels = {
-                    1: [ // Trái cây
-                        {"en": "Apple", "vi": "Táo"},
-                        {"en": "Banana", "vi": "Chuối"},
-                        {"en": "Orange", "vi": "Cam"},
-                        {"en": "Grape", "vi": "Nho"},
-                        {"en": "Watermelon", "vi": "Dưa hấu"},
-                        {"en": "Mango", "vi": "Xoài"},
-                        {"en": "Strawberry", "vi": "Dâu tây"},
-                        {"en": "Pineapple", "vi": "Dứa / Thơm"},
-                        {"en": "Peach", "vi": "Đào"},
-                        {"en": "Coconut", "vi": "Dừa"},
-                        {"en": "Cherry", "vi": "Anh đào"},
-                        {"en": "Papaya", "vi": "Đu đủ"}
+                    1: [
+                        {"en": "Apple", "vi": "Táo"}, {"en": "Banana", "vi": "Chuối"}, {"en": "Orange", "vi": "Cam"},
+                        {"en": "Grape", "vi": "Nho"}, {"en": "Watermelon", "vi": "Dưa hấu"}, {"en": "Mango", "vi": "Xoài"},
+                        {"en": "Strawberry", "vi": "Dâu tây"}, {"en": "Pineapple", "vi": "Dứa / Thơm"}, {"en": "Peach", "vi": "Đào"},
+                        {"en": "Coconut", "vi": "Dừa"}, {"en": "Cherry", "vi": "Anh đào"}, {"en": "Papaya", "vi": "Đu đủ"}
                     ],
-                    2: [ // Màu sắc
+                    2: [
                         {en:'Red',vi:'Đỏ'},{en:'Blue',vi:'Xanh dương'},{en:'Green',vi:'Xanh lá'},{en:'Yellow',vi:'Vàng'},
                         {en:'Pink',vi:'Hồng'},{en:'Purple',vi:'Tím'},{en:'Orange',vi:'Cam'},{en:'Black',vi:'Đen'},
                         {en:'White',vi:'Trắng'},{en:'Gray',vi:'Xám'},{en:'Brown',vi:'Nâu'},{en:'Silver',vi:'Bạc'}
                     ],
-                    3: [ // Động vật
+                    3: [
                         {en:'Elephant',vi:'Voi'},{en:'Monkey',vi:'Khỉ'},{en:'Rabbit',vi:'Thỏ'},{en:'Panda',vi:'Gấu trúc'},
                         {en:'Dolphin',vi:'Cá heo'},{en:'Penguin',vi:'Chim cánh cụt'},{en:'Giraffe',vi:'Hươu cao cổ'},{en:'Kangaroo',vi:'Chuột túi'},
                         {en:'Duck',vi:'Vịt'},{en:'Chicken',vi:'Gà'},{en:'Pig',vi:'Heo'},{en:'Sheep',vi:'Cừu'}
                     ],
-                    4: [ // Đồ dùng học tập
+                    4: [
                         {en:'Pen',vi:'Bút mực'},{en:'Pencil',vi:'Bút chì'},{en:'Ruler',vi:'Thước kẻ'},{en:'Book',vi:'Sách'},
                         {en:'Eraser',vi:'Tẩy'},{en:'Bag',vi:'Cặp sách'},{en:'Desk',vi:'Bàn học'},{en:'Chair',vi:'Ghế'},
                         {en:'Scissors',vi:'Kéo'},{en:'Paper',vi:'Giấy'},{en:'Board',vi:'Bảng'},{en:'Crayon',vi:'Bút màu'}
                     ],
-                    5: [ // Gia đình
+                    5: [
                         {en:'Father',vi:'Bố'},{en:'Mother',vi:'Mẹ'},{en:'Son',vi:'Con trai'},{en:'Daughter',vi:'Con gái'},
                         {en:'Brother',vi:'Anh/Em trai'},{en:'Sister',vi:'Chị/Em gái'},{en:'Baby',vi:'Em bé'},{en:'Grandfather',vi:'Ông'},
                         {en:'Grandmother',vi:'Bà'},{en:'Uncle',vi:'Chú/Bác'},{en:'Aunt',vi:'Cô/Dì'},{en:'Family',vi:'Gia đình'}
                     ],
-                    6: [ // Cơ thể
+                    6: [
                         {en:'Head',vi:'Đầu'},{en:'Eye',vi:'Mắt'},{en:'Nose',vi:'Mũi'},{en:'Mouth',vi:'Miệng'},
                         {en:'Ear',vi:'Tai'},{en:'Hand',vi:'Bàn tay'},{en:'Foot',vi:'Bàn chân'},{en:'Arm',vi:'Cánh tay'},
                         {en:'Leg',vi:'Chân'},{en:'Finger',vi:'Ngón tay'},{en:'Hair',vi:'Tóc'},{en:'Tooth',vi:'Răng'}
                     ],
-                    7: [ // Quần áo
+                    7: [
                         {en:'Shirt',vi:'Áo sơ mi'},{en:'T-Shirt',vi:'Áo thun'},{en:'Pants',vi:'Quần dài'},{en:'Hat',vi:'Mũ/Nón'},
                         {en:'Shoes',vi:'Giày'},{en:'Socks',vi:'Tất/Vớ'},{en:'Skirt',vi:'Chân váy'},{en:'Dress',vi:'Váy liền'},
                         {en:'Coat',vi:'Áo khoác'},{en:'Jacket',vi:'Áo ấm'},{en:'Cap',vi:'Mũ lưỡi trai'},{en:'Belt',vi:'Thắt lưng'}
                     ],
-                    8: [ // Thức ăn & Đồ uống
+                    8: [
                         {en:'Rice',vi:'Cơm'},{en:'Meat',vi:'Thịt'},{en:'Fish',vi:'Cá'},{en:'Soup',vi:'Canh/Súp'},
                         {en:'Egg',vi:'Trứng'},{en:'Cake',vi:'Bánh ngọt'},{en:'Juice',vi:'Nước ép'},{en:'Tea',vi:'Trà'},
                         {en:'Coffee',vi:'Cà phê'},{en:'Ice Cream',vi:'Kem'},{en:'Pizza',vi:'Bánh Pizza'},{en:'Noodles',vi:'Mì'}
                     ],
-                    9: [ // Phương tiện giao thông
+                    9: [
                         {en:'Car',vi:'Ô tô'},{en:'Bus',vi:'Xe buýt'},{en:'Bike',vi:'Xe đạp'},{en:'Motorbike',vi:'Xe máy'},
                         {en:'Train',vi:'Tàu hỏa'},{en:'Plane',vi:'Máy bay'},{en:'Ship',vi:'Tàu thủy'},{en:'Boat',vi:'Thuyền'},
                         {en:'Taxi',vi:'Xe Taxi'},{en:'Truck',vi:'Xe tải'},{en:'Subway',vi:'Tàu điện ngầm'},{en:'Helicopter',vi:'Trực thăng'}
                     ],
-                    10: [ // Cảm xúc & Tính cách
+                    10: [
                         {en:'Happy',vi:'Vui vẻ'},{en:'Sad',vi:'Buồn'},{en:'Angry',vi:'Giận dữ'},{en:'Tired',vi:'Mệt mỏi'},
                         {en:'Scared',vi:'Sợ hãi'},{en:'Brave',vi:'Dũng cảm'},{en:'Kind',vi:'Tốt bụng'},{en:'Smart',vi:'Thông minh'},
                         {en:'Funny',vi:'Hài hước'},{en:'Calm',vi:'Bình tĩnh'},{en:'Excited',vi:'Hào hứng'},{en:'Proud',vi:'Tự hào'}
@@ -236,20 +255,17 @@
                 document.getElementById('excel-file').onchange = (e) => this.readExcel(e);
                 document.getElementById('reset-btn').onclick = () => this.start(this.curLvl);
                 
-                // Nút ✔️ (Tích) qua màn tiếp theo
                 document.getElementById('btn-continue').onclick = () => {
                     this.dom.modal.classList.remove('active');
                     const nextLvl = this.levels[this.curLvl + 1] ? this.curLvl + 1 : 1;
                     this.start(nextLvl);
                 };
 
-                // Nút ↺ (Quay lại) để chơi lại chính màn này
                 document.getElementById('btn-replay').onclick = () => {
                     this.dom.modal.classList.remove('active');
                     this.start(this.curLvl);
                 };
 
-                // Nút ✖ xem lại dạng 2 cột
                 document.getElementById('btn-review').onclick = () => {
                     this.dom.modal.classList.remove('active');
                     this.arrangeReviewMode();
@@ -367,13 +383,11 @@
                 this.dom.modal.classList.add('active');
             }
 
-            // Hiển thị 2 cột xem lại và thêm nút Loa phát âm ở cột Tiếng Anh
             arrangeReviewMode() {
                 this.dom.board.classList.add('review-mode');
                 this.dom.board.innerHTML = '';
 
                 this.cardsData.forEach(pair => {
-                    // Thẻ Tiếng Anh (Có nút loa 🔊)
                     const enEl = document.createElement('div');
                     enEl.className = 'card flipped matched';
                     enEl.style.cursor = 'pointer';
@@ -381,13 +395,11 @@
                         <div class="face back">
                             <div class="type">ENGLISH</div>
                             <div class="text">${pair.en}</div>
-                            <div class="speaker-btn" title="Nghe phát âm">🔊 Nghe</div>
+                            <div class="speaker-btn" title="Nghe giọng nam">🔊 Nghe</div>
                         </div>`;
                     
-                    // Bấm vào nút loa hoặc toàn bộ thẻ Anh để phát âm
                     enEl.onclick = () => speakWord(pair.en);
 
-                    // Thẻ Tiếng Việt
                     const viEl = document.createElement('div');
                     viEl.className = 'card flipped matched';
                     viEl.innerHTML = `
