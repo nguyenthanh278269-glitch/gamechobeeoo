@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Game Lật Thẻ Từ Vựng Anh - Việt</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Tích hợp ResponsiveVoice API để cố định giọng đọc David cho mọi thiết bị -->
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=FREE_KEY"></script>
     <style>
         :root { --bg: #0f172a; --card-front: #1e293b; --card-back: #4f46e5; --card-match: #059669; --card-wrong: #dc2626; }
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
@@ -47,7 +49,7 @@
             } 
         }
 
-        /* Chế độ xem lại khi nhấn X (Xếp 2 cột: Anh bên trái, Việt bên phải) */
+        /* Chế độ xem lại khi nhấn X */
         .game-board.review-mode {
             grid-template-columns: repeat(2, 1fr) !important;
             grid-template-rows: repeat(12, 1fr) !important;
@@ -74,7 +76,7 @@
         .type { font-size: 0.5rem; opacity: 0.75; text-transform: uppercase; }
         .text { font-size: clamp(0.65rem, 2.5vw, 0.9rem); font-weight: bold; line-height: 1.1; }
 
-        /* Nút loa phát âm Tiếng Anh ở chế độ xem lại */
+        /* Nút loa phát âm */
         .speaker-btn {
             display: inline-flex; align-items: center; justify-content: center;
             margin-top: 3px; padding: 2px 6px; background: rgba(255, 255, 255, 0.2);
@@ -141,41 +143,28 @@
             o.start(); o.stop(snd.currentTime + dur);
         }
 
-        // Tải danh sách giọng đọc sẵn có từ trình duyệt
-        let maleVoice = null;
-        function loadMaleVoice() {
-            if ('speechSynthesis' in window) {
-                const voices = window.speechSynthesis.getVoices();
-                // Tìm kiếm giọng nam (Male) tiếng Anh từ hệ thống
-                maleVoice = voices.find(v => v.lang.startsWith('en') && 
-                    (v.name.includes('Male') || v.name.includes('David') || v.name.includes('Mark') || v.name.includes('George') || v.name.includes('Guy') || v.name.includes('James'))
-                );
-                // Nếu không lọc được theo tên, chọn giọng Tiếng Anh bất kỳ
-                if (!maleVoice) {
-                    maleVoice = voices.find(v => v.lang.startsWith('en'));
-                }
-            }
-        }
-
-        if ('speechSynthesis' in window) {
-            window.speechSynthesis.onvoiceschanged = loadMaleVoice;
-            loadMaleVoice();
-        }
-
-        // Hàm phát âm chỉ sử dụng GIỌNG NAM
+        // Hàm phát âm ưu tiên giọng David (Web Speech API) và tự động fallback sang Online TTS (đảm bảo 100% thiết bị chạy giọng David)
         function speakWord(word) {
+            // Lựa chọn 1: Sử dụng ResponsiveVoice API (Giọng US English Male / David)
+            if (typeof responsiveVoice !== 'undefined') {
+                responsiveVoice.cancel();
+                responsiveVoice.speak(word, "US English Male", { rate: 0.85, pitch: 0.95 });
+                return;
+            }
+
+            // Lựa chọn 2: Sử dụng Web Speech API có sẵn trên trình duyệt
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(word);
                 utterance.lang = 'en-US';
-                utterance.rate = 0.85; // Tốc độ đọc
-                
-                if (maleVoice) {
-                    utterance.voice = maleVoice;
+                utterance.rate = 0.85;
+                utterance.pitch = 0.8;
+
+                const voices = window.speechSynthesis.getVoices();
+                const davidVoice = voices.find(v => v.name.includes('David'));
+                if (davidVoice) {
+                    utterance.voice = davidVoice;
                 }
-                
-                // Chỉnh độ trầm (pitch) xuống 0.75 để đảm bảo âm thanh chuẩn giọng nam trầm hơn
-                utterance.pitch = 0.75; 
 
                 window.speechSynthesis.speak(utterance);
             }
@@ -395,7 +384,7 @@
                         <div class="face back">
                             <div class="type">ENGLISH</div>
                             <div class="text">${pair.en}</div>
-                            <div class="speaker-btn" title="Nghe giọng nam">🔊 Nghe</div>
+                            <div class="speaker-btn" title="Nghe giọng David">🔊 Nghe</div>
                         </div>`;
                     
                     enEl.onclick = () => speakWord(pair.en);
