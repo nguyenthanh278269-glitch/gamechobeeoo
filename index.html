@@ -3,142 +3,488 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Game Lật Thẻ Từ Vựng Anh - Việt</title>
+    <title>Sảnh Chờ Học Tiếng Anh - Game Lobby</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <!-- Tích hợp ResponsiveVoice API để cố định giọng đọc David cho mọi thiết bị -->
     <script src="https://code.responsivevoice.org/responsivevoice.js?key=FREE_KEY"></script>
     <style>
-        :root { --bg: #0f172a; --card-front: #1e293b; --card-back: #4f46e5; --card-match: #059669; --card-wrong: #dc2626; }
+        :root { 
+            --bg: #0f172a; 
+            --card-bg: #1e293b; 
+            --primary: #4f46e5; 
+            --success: #059669; 
+            --danger: #dc2626; 
+            --accent: #38bdf8;
+            --warning: #f59e0b;
+            --purple: #a855f7;
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
         
         html, body { 
             width: 100%; height: 100svh; height: 100vh; overflow: hidden; 
             font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: #fff; 
-            display: flex; flex-direction: column; align-items: center; padding: 6px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
+
+        /* ----- LOBBY MENU STYLES ----- */
+        .lobby-container {
+            width: 100%; max-width: 950px; padding: 20px; text-align: center;
+            display: flex; flex-direction: column; align-items: center; gap: 20px;
+            overflow-y: auto; max-height: 100vh;
+        }
+
+        .lobby-title {
+            font-size: clamp(1.5rem, 5vw, 2.2rem);
+            color: #fbbf24;
+            text-shadow: 0 4px 10px rgba(251, 191, 36, 0.3);
+        }
+
+        .lobby-subtitle {
+            font-size: 0.9rem; color: #94a3b8; margin-top: -10px;
+        }
+
+        .game-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px; width: 100%; margin-top: 10px;
+        }
+
+        .game-card {
+            background: var(--card-bg);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px; padding: 18px;
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+            cursor: pointer; transition: all 0.3s ease; position: relative; overflow: hidden;
+        }
+
+        .game-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent);
+            box-shadow: 0 10px 25px rgba(56, 189, 248, 0.25);
+        }
+
+        .game-icon { font-size: 2.5rem; }
+        .game-card-title { font-size: 1.05rem; font-weight: bold; color: #f8fafc; }
+        .game-card-desc { font-size: 0.78rem; color: #94a3b8; line-height: 1.3; }
         
+        .btn-play {
+            margin-top: 8px; background: var(--primary); color: white; border: none;
+            padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 0.85rem;
+            cursor: pointer; transition: background 0.2s;
+        }
+        .game-card:hover .btn-play { background: #6366f1; }
+
+        /* ----- GAME CONTAINER SCREEN ----- */
+        .screen { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; padding: 6px; }
+        .screen.active { display: flex; }
+
         header { width: 100%; max-width: 1000px; background: rgba(30,41,59,0.85); padding: 6px 10px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; gap: 4px; margin-bottom: 6px; flex-shrink: 0; }
         .stats { display: flex; gap: 4px; }
         .stat { background: rgba(15,23,42,0.6); padding: 2px 6px; border-radius: 6px; font-size: 0.7rem; text-align: center; }
-        .stat span { display: block; font-weight: bold; font-size: 0.85rem; color: #38bdf8; }
+        .stat span { display: block; font-weight: bold; font-size: 0.85rem; color: var(--accent); }
         
         .controls { display: flex; gap: 4px; align-items: center; }
-        .btn, select { background: #4f46e5; color: #fff; border: none; padding: 5px 8px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.75rem; }
+        .btn, select { background: var(--primary); color: #fff; border: none; padding: 5px 8px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.75rem; }
         .btn-sec { background: #334155; }
+        .btn-home { background: #e11d48; }
         #excel-file { display: none; }
 
+        /* ----- GAME 1: FLIP CARDS ----- */
         .game-board {
             width: 100%; max-width: 1000px; flex-grow: 1;
             display: grid; gap: 4px; perspective: 1000px;
             grid-template-columns: repeat(6, 1fr);
             grid-template-rows: repeat(4, 1fr);
         }
-
         @media (max-width: 480px) { 
-            .game-board { 
-                grid-template-columns: repeat(3, 1fr); 
-                grid-template-rows: repeat(8, 1fr); 
-                gap: 4px;
-            } 
+            .game-board { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(8, 1fr); gap: 4px; } 
         }
-
         @media (min-width: 481px) and (max-width: 768px) { 
-            .game-board { 
-                grid-template-columns: repeat(4, 1fr); 
-                grid-template-rows: repeat(6, 1fr); 
-            } 
+            .game-board { grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(6, 1fr); } 
         }
-
-        /* Chế độ xem lại khi nhấn X */
         .game-board.review-mode {
-            grid-template-columns: repeat(2, 1fr) !important;
-            grid-template-rows: repeat(12, 1fr) !important;
-            overflow-y: auto !important;
-            padding-right: 2px;
+            grid-template-columns: repeat(2, 1fr) !important; grid-template-rows: repeat(12, 1fr) !important;
+            overflow-y: auto !important; padding-right: 2px;
         }
 
-        .card { height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.3s ease; cursor: pointer; will-change: transform; }
+        .card { height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.3s ease; cursor: pointer; }
         .card.flipped, .card.matched { transform: rotateY(180deg); }
         .card.wrong { animation: shake 0.3s; }
-        
-        /* Hiệu ứng khi thẻ Tiếng Anh đã ghép đúng được nhấp lại để nghe âm thanh */
         .card.matched[data-type="EN"] { cursor: pointer; }
         .card.matched[data-type="EN"]:active { transform: rotateY(180deg) scale(0.95); }
 
-        .face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px; text-align: center; border: 1px solid rgba(255,255,255,0.1); }
-        .front { background: var(--card-front); font-size: 1.1rem; color: #64748b; }
+        .face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px; text-align: center; border: 1px solid rgba(255,255,255,0.1); }
+        .front { background: var(--card-bg); font-size: 1.1rem; color: #64748b; }
         .front::after { content: '?'; }
-        .back { background: var(--card-back); transform: rotateY(180deg); word-break: break-word; }
-        
-        .card.matched .back { 
-            background: var(--card-match); 
-            border-color: #34d399;
-            box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
-        }
-        .card.wrong .back { background: var(--card-wrong); }
+        .back { background: var(--primary); transform: rotateY(180deg); word-break: break-word; }
+        .card.matched .back { background: var(--success); border-color: #34d399; box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
+        .card.wrong .back { background: var(--danger); }
         .type { font-size: 0.5rem; opacity: 0.75; text-transform: uppercase; }
         .text { font-size: clamp(0.65rem, 2.5vw, 0.9rem); font-weight: bold; line-height: 1.1; }
-
-        /* Nút loa hiển thị trên thẻ Tiếng Anh sau khi đã ghép đúng */
-        .speaker-icon {
-            display: inline-block; margin-top: 2px; font-size: 0.7rem; color: #fef08a;
-        }
-
-        .speaker-btn {
-            display: inline-flex; align-items: center; justify-content: center;
-            margin-top: 3px; padding: 2px 6px; background: rgba(255, 255, 255, 0.2);
-            border-radius: 12px; font-size: 0.7rem; cursor: pointer;
-            transition: background 0.2s, transform 0.1s;
-        }
-        .speaker-btn:active { transform: scale(0.9); background: rgba(255, 255, 255, 0.4); }
+        .speaker-icon { display: inline-block; margin-top: 2px; font-size: 0.7rem; color: #fef08a; }
 
         @keyframes shake { 0%,100%{transform:rotateY(180deg) translateX(0)} 25%{transform:rotateY(180deg) translateX(-4px)} 75%{transform:rotateY(180deg) translateX(4px)} }
+
+        /* ----- GAME 2: ĐIỀN TỪ VÀO CHỖ TRỐNG ----- */
+        .g2-wrapper {
+            width: 100%; max-width: 650px; margin: auto; display: flex; flex-direction: column; gap: 15px; padding: 10px;
+        }
+
+        .g2-level-select-screen {
+            background: var(--card-bg); border-radius: 16px; padding: 25px; text-align: center;
+            border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; gap: 15px;
+        }
+
+        .g2-level-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px;
+        }
+
+        .g2-level-btn {
+            background: #0f172a; border: 1px solid #334155; padding: 12px; border-radius: 10px;
+            color: #fff; font-size: 0.85rem; cursor: pointer; text-align: left; transition: all 0.2s;
+        }
+        .g2-level-btn:hover { border-color: var(--accent); background: #1e293b; transform: translateY(-2px); }
+
+        .g2-play-screen {
+            display: none; background: var(--card-bg); border-radius: 16px; padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1); flex-direction: column; gap: 15px;
+        }
+        .g2-play-screen.active { display: flex; }
+
+        .g2-hint-box {
+            background: rgba(245, 158, 11, 0.15); border: 1px dashed var(--warning);
+            padding: 10px; border-radius: 8px; color: #fef08a; font-size: 0.85rem; text-align: center;
+        }
+
+        .g2-sentence-box {
+            font-size: 1.2rem; font-weight: bold; text-align: center; line-height: 1.5;
+            color: #f8fafc; padding: 15px; background: rgba(15,23,42,0.6); border-radius: 10px;
+        }
+
+        .g2-blank {
+            color: var(--accent); text-decoration: underline; padding: 0 6px;
+        }
+
+        .g2-options-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+        }
+
+        .g2-opt-btn {
+            background: #334155; color: #fff; border: 1px solid rgba(255,255,255,0.1);
+            padding: 12px; border-radius: 8px; font-size: 1rem; font-weight: 600;
+            cursor: pointer; transition: background 0.2s;
+        }
+        .g2-opt-btn:hover { background: #475569; }
+        .g2-opt-btn.correct { background: var(--success) !important; color: white; }
+        .g2-opt-btn.incorrect { background: var(--danger) !important; color: white; }
+
+        /* ----- GAME 3 & GAME 4 STYLES ----- */
+        .quiz-container {
+            width: 100%; max-width: 650px; background: var(--card-bg); border-radius: 16px;
+            padding: 20px; display: flex; flex-direction: column; gap: 15px; margin: auto;
+            border: 1px solid rgba(255,255,255,0.1); max-height: 85vh; overflow-y: auto;
+        }
+
+        .g3-input-box {
+            display: flex; gap: 10px; margin-top: 10px;
+        }
+        .g3-input {
+            flex: 1; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);
+            background: #0f172a; color: #fff; font-size: 1.1rem; font-weight: bold; text-align: center;
+            outline: none;
+        }
+        .g3-input:focus { border-color: var(--accent); }
+
+        .forms-guide-card {
+            background: rgba(168, 85, 247, 0.12); border: 1px solid var(--purple);
+            padding: 10px 14px; border-radius: 10px; font-size: 0.8rem; color: #e2e8f0; line-height: 1.4;
+        }
+
+        .quiz-question { font-size: 1.3rem; font-weight: bold; color: #f8fafc; text-align: center; }
+        .quiz-options { display: flex; flex-direction: column; gap: 10px; }
+        .quiz-btn {
+            background: #334155; color: #fff; border: 1px solid rgba(255,255,255,0.1);
+            padding: 12px; border-radius: 8px; text-align: left; font-size: 0.95rem; cursor: pointer; transition: background 0.2s;
+        }
+        .quiz-btn:hover { background: #475569; }
+        .quiz-btn.correct { background: var(--success) !important; }
+        .quiz-btn.incorrect { background: var(--danger) !important; }
 
         /* Modal chiến thắng */
         .modal { position: fixed; inset: 0; background: rgba(15,23,42,0.85); display: none; align-items: center; justify-content: center; z-index: 10; }
         .modal.active { display: flex; }
         .modal-box { background: #1e293b; padding: 20px; border-radius: 16px; text-align: center; max-width: 320px; width: 90%; border: 1px solid rgba(255,255,255,0.1); }
-        
         .modal-actions { display: flex; justify-content: center; gap: 15px; margin-top: 15px; }
-        .action-btn { width: 46px; height: 46px; border-radius: 50%; border: none; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }
-        .action-btn:hover { transform: scale(1.1); }
+        .action-btn { width: 46px; height: 46px; border-radius: 50%; border: none; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .btn-close { background: #ef4444; color: white; }
         .btn-replay { background: #f59e0b; color: white; }
         .btn-next { background: #10b981; color: white; }
     </style>
 </head>
 <body>
-    <header>
-        <h2 style="font-size: 0.85rem; color: #38bdf8;">🃏 Chơi Lật Thẻ Nè Bé eooo</h2>
-        <div class="stats">
-            <div class="stat">Màn <span id="lvl">1</span></div>
-            <div class="stat">Thời gian <span id="time">00:00</span></div>
-            <div class="stat">Lật <span id="moves">0</span></div>
-            <div class="stat">Điểm <span id="score">0/12</span></div>
-        </div>
-        <div class="controls">
-            <select id="lvl-select"></select>
-            <label for="excel-file" class="btn btn-sec">📁 Excel</label>
-            <input type="file" id="excel-file" accept=".xlsx,.xls">
-            <button class="btn" id="reset-btn">🔄 Lại</button>
-        </div>
-    </header>
 
-    <div class="game-board" id="board"></div>
+    <!-- 1. SẢNH CHỜ (MENU LOBBY) -->
+    <div class="lobby-container" id="lobby-screen">
+        <div>
+            <h1 class="lobby-title">🎮 Game Tiếng Anh Cho Bé Nè</h1>
+            <p class="lobby-subtitle">Chọn game để vừa chơi vừa học tiếng Anh nhé bé eooo!</p>
+        </div>
 
+        <div class="game-cards">
+            <!-- Game 1 Card -->
+            <div class="game-card" onclick="switchScreen('game1')">
+                <div class="game-icon">🃏</div>
+                <div class="game-card-title">1. Lật Thẻ Từ Vựng</div>
+                <div class="game-card-desc">Lật và ghép các cặp từ Tiếng Anh - Tiếng Việt với giọng phát âm chuẩn!</div>
+                <button class="btn-play">Chơi Ngay</button>
+            </div>
+
+            <!-- Game 2 Card -->
+            <div class="game-card" onclick="switchScreen('game2')">
+                <div class="game-icon">✏️</div>
+                <div class="game-card-title">2. Điền Từ Theo Thì</div>
+                <div class="game-card-desc">Lựa chọn Cấp 1-10, nhận gợi ý và hoàn thành câu đúng cấu trúc.</div>
+                <button class="btn-play">Chơi Ngay</button>
+            </div>
+
+            <!-- Game 3 Card -->
+            <div class="game-card" onclick="switchScreen('game3')">
+                <div class="game-icon">🔤</div>
+                <div class="game-card-title">3. Điền Chữ Cái Ẩn</div>
+                <div class="game-card-desc">Đoán từ Tiếng Anh dựa vào nghĩa và các chữ cái ẩn bị khuyết (Ví dụ: a..le = quả táo).</div>
+                <button class="btn-play">Chơi Ngay</button>
+            </div>
+
+            <!-- Game 4 Card -->
+            <div class="game-card" onclick="switchScreen('game4')">
+                <div class="game-icon">⚡</div>
+                <div class="game-card-title">4. Các Thể Của TO BE</div>
+                <div class="game-card-desc">Luyện tập 3 thể: Khẳng định, Phủ định (not) và Câu hỏi nghi vấn.</div>
+                <button class="btn-play" style="background: var(--purple);">Chơi Ngay</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. MÀN HÌNH GAME 1: LẬT THẺ -->
+    <div class="screen" id="game1-screen">
+        <header>
+            <button class="btn btn-home" onclick="switchScreen('lobby')">🏠 Menu</button>
+            <div class="stats">
+                <div class="stat">Màn <span id="lvl">1</span></div>
+                <div class="stat">Thời gian <span id="time">00:00</span></div>
+                <div class="stat">Lật <span id="moves">0</span></div>
+                <div class="stat">Điểm <span id="score">0/12</span></div>
+            </div>
+            <div class="controls">
+                <select id="lvl-select"></select>
+                <label for="excel-file" class="btn btn-sec">📁 Excel</label>
+                <input type="file" id="excel-file" accept=".xlsx,.xls">
+                <button class="btn" id="reset-btn">🔄 Lại</button>
+            </div>
+        </header>
+        <div class="game-board" id="board"></div>
+    </div>
+
+    <!-- 3. MÀN HÌNH GAME 2: ĐIỀN TỪ VÀO CHỖ TRỐNG -->
+    <div class="screen" id="game2-screen">
+        <header>
+            <button class="btn btn-home" onclick="switchScreen('lobby')">🏠 Menu</button>
+            <h2 style="font-size:0.9rem; color:#38bdf8;">✏️ Điền Từ Vào Chỗ Trống</h2>
+            <button class="btn btn-sec" onclick="showG2LevelSelect()">📋 Đổi Cấp</button>
+        </header>
+
+        <div class="g2-wrapper">
+            <div class="g2-level-select-screen" id="g2-select-screen">
+                <h2 style="color:#fbbf24;">Chọn Cấp Độ Luyện Tập</h2>
+                <p style="font-size:0.85rem; color:#94a3b8;">Chọn 1 trong 10 cấp độ để bắt đầu thử thách điền từ!</p>
+                <div class="g2-level-grid" id="g2-level-grid"></div>
+            </div>
+
+            <div class="g2-play-screen" id="g2-play-screen">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:0.85rem; color:#cbd5e1;" id="g2-level-title">Cấp 1</span>
+                    <span style="font-size:0.85rem; color:var(--accent);" id="g2-progress">Câu 1/5</span>
+                </div>
+
+                <div class="g2-hint-box" id="g2-hint">
+                    💡 <b>Gợi ý thì:</b> Thì Hiện Tại Đơn (Present Simple)
+                </div>
+
+                <div class="g2-sentence-box" id="g2-sentence">
+                    She <span class="g2-blank">_______</span> (play) badminton every morning.
+                </div>
+
+                <div class="g2-options-grid" id="g2-options"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. MÀN HÌNH GAME 3: ĐOÁN TỪ TIẾNG ANH KHUYẾT CHỮ CÁI -->
+    <div class="screen" id="game3-screen">
+        <header>
+            <button class="btn btn-home" onclick="switchScreen('lobby')">🏠 Menu</button>
+            <h2 style="font-size:0.9rem; color:#38bdf8;">🔤 Điền Từ Theo Chủ Đề</h2>
+            <div class="controls">
+                <select id="g3-lvl-select" onchange="startG3Game(+this.value)"></select>
+                <div class="stat">Điểm <span id="g3-score">0</span></div>
+            </div>
+        </header>
+        <div class="quiz-container">
+            <div class="g2-hint-box">
+                💡 Nhìn từ gợi ý và gõ lại đầy đủ từ Tiếng Anh chính xác nhé bé!
+            </div>
+
+            <div class="quiz-question" id="g3-question">Apple = a..le</div>
+            
+            <div class="g3-input-box">
+                <input type="text" class="g3-input" id="g3-answer" placeholder="Nhập từ Tiếng Anh đầy đủ..." autocomplete="off">
+                <button class="btn" style="background:var(--success); font-weight:bold;" onclick="checkG3Answer()">Gửi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. MÀN HÌNH GAME 4: CÁC THỂ CỦA TO BE -->
+    <div class="screen" id="game4-screen">
+        <header>
+            <button class="btn btn-home" onclick="switchScreen('lobby')">🏠 Menu</button>
+            <h2 style="font-size:0.9rem; color:var(--purple);">⚡ 3 Thể Động Từ To Be</h2>
+            <div class="stat">Điểm <span id="g4-score">0</span></div>
+        </header>
+        <div class="quiz-container">
+            <div class="forms-guide-card">
+                <b>📌 Cấu trúc 3 Thể Động Từ TO BE:</b><br>
+                • <b>(+) Khẳng định:</b> S + To Be (am/is/are/was/were...)<br>
+                • <b>(-) Phủ định:</b> S + To Be + <b>NOT</b> (is not = isn't, was not = wasn't, are not = aren't...)<br>
+                • <b>(?) Nghi vấn:</b> <b>To Be</b> + S ...? (Trả lời: Yes, S + To Be / No, S + To Be + not)
+            </div>
+
+            <div class="quiz-question" id="g4-question">Câu hỏi thể To Be sẽ hiển thị ở đây</div>
+            <div class="quiz-options" id="g4-options"></div>
+        </div>
+    </div>
+
+    <!-- MODAL CHUNG KHI CHIẾN THẮNG -->
     <div class="modal" id="modal">
         <div class="modal-box">
             <h2 style="color:#fbbf24; margin-bottom:6px;">🎉 BÉ XUẤT SẮC CỰC!</h2>
-            <p style="font-size: 0.85rem; color: #cbd5e1;">Thời gian: <b id="m-time"></b> | Số lượt: <b id="m-moves"></b></p>
+            <p style="font-size: 0.85rem; color: #cbd5e1;">Thời gian: <b id="m-time">--</b> | Số lượt: <b id="m-moves">--</b></p>
             <div class="modal-actions">
-                <button class="action-btn btn-close" id="btn-review" title="Tắt để xem lại 2 cột">✖</button>
-                <button class="action-btn btn-replay" id="btn-replay" title="Chơi lại màn này">↺</button>
-                <button class="action-btn btn-next" id="btn-continue" title="Qua màn tiếp theo">✔</button>
+                <button class="action-btn btn-close" id="btn-review" title="Xem lại">✖</button>
+                <button class="action-btn btn-replay" id="btn-replay" title="Chơi lại">↺</button>
+                <button class="action-btn btn-next" id="btn-continue" title="Tiếp tục">✔</button>
             </div>
         </div>
     </div>
 
     <script>
+        // GLOBAL DATA SHARED BETWEEN GAME 1 & GAME 3 (10 CHỦ ĐỀ)
+        let sharedLevels = {
+            1: [
+                {"en": "Apple", "vi": "Quả táo"}, {"en": "Banana", "vi": "Quả chuối"}, {"en": "Orange", "vi": "Quả cam"},
+                {"en": "Grape", "vi": "Quả nho"}, {"en": "Watermelon", "vi": "Dưa hấu"}, {"en": "Mango", "vi": "Quả xoài"},
+                {"en": "Strawberry", "vi": "Dâu tây"}, {"en": "Pineapple", "vi": "Quả dứa"}, {"en": "Peach", "vi": "Quả đào"},
+                {"en": "Coconut", "vi": "Quả dừa"}, {"en": "Cherry", "vi": "Anh đào"}, {"en": "Papaya", "vi": "Đu đủ"}
+            ],
+            2: [
+                {"en": "Red", "vi": "Màu đỏ"}, {"en": "Blue", "vi": "Màu xanh dương"}, {"en": "Green", "vi": "Màu xanh lá"},
+                {"en": "Yellow", "vi": "Màu vàng"}, {"en": "Pink", "vi": "Màu hồng"}, {"en": "Purple", "vi": "Màu tím"},
+                {"en": "Orange", "vi": "Màu cam"}, {"en": "Black", "vi": "Màu đen"}, {"en": "White", "vi": "Màu trắng"},
+                {"en": "Gray", "vi": "Màu xám"}, {"en": "Brown", "vi": "Màu nâu"}, {"en": "Silver", "vi": "Màu bạc"}
+            ],
+            3: [
+                {"en": "Dog", "vi": "Con chó"}, {"en": "Cat", "vi": "Con mèo"}, {"en": "Elephant", "vi": "Con voi"},
+                {"en": "Tiger", "vi": "Con hổ"}, {"en": "Lion", "vi": "Sư tử"}, {"en": "Monkey", "vi": "Con khỉ"},
+                {"en": "Rabbit", "vi": "Con thỏ"}, {"en": "Panda", "vi": "Gấu trúc"}, {"en": "Dolphin", "vi": "Cá cá heo"},
+                {"en": "Giraffe", "vi": "Hươu cao cổ"}, {"en": "Penguin", "vi": "Chim cánh cụt"}, {"en": "Bear", "vi": "Con gấu"}
+            ],
+            4: [
+                {"en": "Father", "vi": "Bố"}, {"en": "Mother", "vi": "Mẹ"}, {"en": "Brother", "vi": "Anh/Em trai"},
+                {"en": "Sister", "vi": "Chị/Em gái"}, {"en": "Grandfather", "vi": "Ông"}, {"en": "Grandmother", "vi": "Bà"},
+                {"en": "Uncle", "vi": "Chú/Bác/Cậu"}, {"en": "Aunt", "vi": "Cô/Dì/Thím"}, {"en": "Cousin", "vi": "Anh chị em họ"},
+                {"en": "Baby", "vi": "Em bé"}, {"en": "Parents", "vi": "Bố mẹ"}, {"en": "Family", "vi": "Gia đình"}
+            ],
+            5: [
+                {"en": "Teacher", "vi": "Giáo viên"}, {"en": "Doctor", "vi": "Bác sĩ"}, {"en": "Nurse", "vi": "Y sĩ / Y tá"},
+                {"en": "Police", "vi": "Cảnh sát"}, {"en": "Firefighter", "vi": "Lính hỏa hỏa"}, {"en": "Chef", "vi": "Đầu bếp"},
+                {"en": "Pilot", "vi": "Phi công"}, {"en": "Singer", "vi": "Ca sĩ"}, {"en": "Farmer", "vi": "Nông dân"},
+                {"en": "Driver", "vi": "Tài xế"}, {"en": "Artist", "vi": "Họa sĩ"}, {"en": "Dentist", "vi": "Nha sĩ"}
+            ],
+            6: [
+                {"en": "Book", "vi": "Quyển sách"}, {"en": "Pencil", "vi": "Bút chì"}, {"en": "Ruler", "vi": "Thước kẻ"},
+                {"en": "Eraser", "vi": "Cục tẩy"}, {"en": "Backpack", "vi": "Balo đi học"}, {"en": "Desk", "vi": "Bàn học"},
+                {"en": "Chair", "vi": "Cái ghế"}, {"en": "Classroom", "vi": "Lớp học"}, {"en": "Board", "vi": "Cái bảng"},
+                {"en": "Scissors", "vi": "Cái kéo"}, {"en": "Notebook", "vi": "Vở bài tập"}, {"en": "Computer", "vi": "Máy tính"}
+            ],
+            7: [
+                {"en": "Pizza", "vi": "Bánh pizza"}, {"en": "Burger", "vi": "Bánh hamburger"}, {"en": "Milk", "vi": "Sữa tươi"},
+                {"en": "Water", "vi": "Nước lọc"}, {"en": "Bread", "vi": "Bánh mì"}, {"en": "Rice", "vi": "Cơm / Gạo"},
+                {"en": "Chicken", "vi": "Thịt gà"}, {"en": "Noodles", "vi": "Mì sợi"}, {"en": "Juice", "vi": "Nước ép"},
+                {"en": "Cheese", "vi": "Phô mai"}, {"en": "Cake", "vi": "Bánh ngọt"}, {"en": "Icecream", "vi": "Kem"}
+            ],
+            8: [
+                {"en": "Football", "vi": "Bóng đá"}, {"en": "Basketball", "vi": "Bóng rổ"}, {"en": "Badminton", "vi": "Cầu lông"},
+                {"en": "Tennis", "vi": "Quần vợt"}, {"en": "Swimming", "vi": "Bơi lội"}, {"en": "Running", "vi": "Chạy bộ"},
+                {"en": "Volleyball", "vi": "Bóng chuyền"}, {"en": "Cycling", "vi": "Đi xe đạp"}, {"en": "Skating", "vi": "Trượt băng"},
+                {"en": "Boxing", "vi": "Quyền anh"}, {"en": "Fishing", "vi": "Câu cá"}, {"en": "Karate", "vi": "Võ Karate"}
+            ],
+            9: [
+                {"en": "Sunny", "vi": "Trời nắng"}, {"en": "Rainy", "vi": "Trời mưa"}, {"en": "Cloudy", "vi": "Có nhiều mây"},
+                {"en": "Windy", "vi": "Có gió lớn"}, {"en": "Snowy", "vi": "Có tuyết rơi"}, {"en": "Stormy", "vi": "Có bão"},
+                {"en": "Spring", "vi": "Mùa xuân"}, {"en": "Summer", "vi": "Mùa hạ"}, {"en": "Autumn", "vi": "Mùa thu"},
+                {"en": "Winter", "vi": "Mùa đông"}, {"en": "Rainbow", "vi": "Cầu vồng"}, {"en": "Hot", "vi": "Nóng bức"}
+            ],
+            10: [
+                {"en": "Head", "vi": "Cái đầu"}, {"en": "Eye", "vi": "Con mắt"}, {"en": "Nose", "vi": "Cái mũi"},
+                {"en": "Mouth", "vi": "Cái miệng"}, {"en": "Ear", "vi": "Cái tai"}, {"en": "Hand", "vi": "Bàn tay"},
+                {"en": "Foot", "vi": "Bàn chân"}, {"en": "Arm", "vi": "Cánh tay"}, {"en": "Leg", "vi": "Cái chân"},
+                {"en": "Face", "vi": "Khuôn mặt"}, {"en": "Finger", "vi": "Ngón tay"}, {"en": "Tooth", "vi": "Cái răng"}
+            ]
+        };
+
+        let sharedLevelNames = { 
+            1: 'Chủ đề 1: Trái cây', 
+            2: 'Chủ đề 2: Màu sắc',
+            3: 'Chủ đề 3: Động vật',
+            4: 'Chủ đề 4: Gia đình',
+            5: 'Chủ đề 5: Nghề nghiệp',
+            6: 'Chủ đề 6: Trường học',
+            7: 'Chủ đề 7: Thức ăn & Đồ uống',
+            8: 'Chủ đề 8: Môn thể thao',
+            9: 'Chủ đề 9: Thời tiết & Mùa',
+            10: 'Chủ đề 10: Cơ thể người'
+        };
+
+        // --- CHUYỂN MÀN HÌNH (ROUTING) ---
+        function switchScreen(target) {
+            document.getElementById('lobby-screen').style.display = target === 'lobby' ? 'flex' : 'none';
+            document.getElementById('game1-screen').classList.toggle('active', target === 'game1');
+            document.getElementById('game2-screen').classList.toggle('active', target === 'game2');
+            document.getElementById('game3-screen').classList.toggle('active', target === 'game3');
+            document.getElementById('game4-screen').classList.toggle('active', target === 'game4');
+
+            if (target === 'game1' && !window.g1) window.g1 = new MemoryGame();
+            if (target === 'game2') showG2LevelSelect();
+            if (target === 'game3') initG3Select();
+            if (target === 'game4') startFormsGame();
+        }
+
+        // --- PHÁT ÂM GIỌNG DAVID ---
+        function speakWord(word) {
+            if (typeof responsiveVoice !== 'undefined') {
+                responsiveVoice.cancel();
+                responsiveVoice.speak(word, "US English Male", { rate: 0.85, pitch: 0.95 });
+                return;
+            }
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(word);
+                utterance.lang = 'en-US'; utterance.rate = 0.85; utterance.pitch = 0.8;
+                const voices = window.speechSynthesis.getVoices();
+                const davidVoice = voices.find(v => v.name.includes('David'));
+                if (davidVoice) utterance.voice = davidVoice;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
         const snd = new (window.AudioContext || window.webkitAudioContext)();
         function playSnd(freq, type='sine', dur=0.1) {
             if (snd.state === 'suspended') snd.resume();
@@ -150,90 +496,11 @@
             o.start(); o.stop(snd.currentTime + dur);
         }
 
-        // Phát âm giọng David cho mọi thiết bị
-        function speakWord(word) {
-            if (typeof responsiveVoice !== 'undefined') {
-                responsiveVoice.cancel();
-                responsiveVoice.speak(word, "US English Male", { rate: 0.85, pitch: 0.95 });
-                return;
-            }
-
-            if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance(word);
-                utterance.lang = 'en-US';
-                utterance.rate = 0.85;
-                utterance.pitch = 0.8;
-
-                const voices = window.speechSynthesis.getVoices();
-                const davidVoice = voices.find(v => v.name.includes('David'));
-                if (davidVoice) utterance.voice = davidVoice;
-
-                window.speechSynthesis.speak(utterance);
-            }
-        }
-
-        class Game {
+        // ==========================================
+        // GAME 1: LẬT THẺ TỪ VỰNG
+        // ==========================================
+        class MemoryGame {
             constructor() {
-                this.levels = {
-                    1: [
-                        {"en": "Apple", "vi": "Táo"}, {"en": "Banana", "vi": "Chuối"}, {"en": "Orange", "vi": "Cam"},
-                        {"en": "Grape", "vi": "Nho"}, {"en": "Watermelon", "vi": "Dưa hấu"}, {"en": "Mango", "vi": "Xoài"},
-                        {"en": "Strawberry", "vi": "Dâu tây"}, {"en": "Pineapple", "vi": "Dứa / Thơm"}, {"en": "Peach", "vi": "Đào"},
-                        {"en": "Coconut", "vi": "Dừa"}, {"en": "Cherry", "vi": "Anh đào"}, {"en": "Papaya", "vi": "Đu đủ"}
-                    ],
-                    2: [
-                        {en:'Red',vi:'Đỏ'},{en:'Blue',vi:'Xanh dương'},{en:'Green',vi:'Xanh lá'},{en:'Yellow',vi:'Vàng'},
-                        {en:'Pink',vi:'Hồng'},{en:'Purple',vi:'Tím'},{en:'Orange',vi:'Cam'},{en:'Black',vi:'Đen'},
-                        {en:'White',vi:'Trắng'},{en:'Gray',vi:'Xám'},{en:'Brown',vi:'Nâu'},{en:'Silver',vi:'Bạc'}
-                    ],
-                    3: [
-                        {en:'Elephant',vi:'Voi'},{en:'Monkey',vi:'Khỉ'},{en:'Rabbit',vi:'Thỏ'},{en:'Panda',vi:'Gấu trúc'},
-                        {en:'Dolphin',vi:'Cá heo'},{en:'Penguin',vi:'Chim cánh cụt'},{en:'Giraffe',vi:'Hươu cao cổ'},{en:'Kangaroo',vi:'Chuột túi'},
-                        {en:'Duck',vi:'Vịt'},{en:'Chicken',vi:'Gà'},{en:'Pig',vi:'Heo'},{en:'Sheep',vi:'Cừu'}
-                    ],
-                    4: [
-                        {en:'Pen',vi:'Bút mực'},{en:'Pencil',vi:'Bút chì'},{en:'Ruler',vi:'Thước kẻ'},{en:'Book',vi:'Sách'},
-                        {en:'Eraser',vi:'Tẩy'},{en:'Bag',vi:'Cặp sách'},{en:'Desk',vi:'Bàn học'},{en:'Chair',vi:'Ghế'},
-                        {en:'Scissors',vi:'Kéo'},{en:'Paper',vi:'Giấy'},{en:'Board',vi:'Bảng'},{en:'Crayon',vi:'Bút màu'}
-                    ],
-                    5: [
-                        {en:'Father',vi:'Bố'},{en:'Mother',vi:'Mẹ'},{en:'Son',vi:'Con trai'},{en:'Daughter',vi:'Con gái'},
-                        {en:'Brother',vi:'Anh/Em trai'},{en:'Sister',vi:'Chị/Em gái'},{en:'Baby',vi:'Em bé'},{en:'Grandfather',vi:'Ông'},
-                        {en:'Grandmother',vi:'Bà'},{en:'Uncle',vi:'Chú/Bác'},{en:'Aunt',vi:'Cô/Dì'},{en:'Family',vi:'Gia đình'}
-                    ],
-                    6: [
-                        {en:'Head',vi:'Đầu'},{en:'Eye',vi:'Mắt'},{en:'Nose',vi:'Mũi'},{en:'Mouth',vi:'Miệng'},
-                        {en:'Ear',vi:'Tai'},{en:'Hand',vi:'Bàn tay'},{en:'Foot',vi:'Bàn chân'},{en:'Arm',vi:'Cánh tay'},
-                        {en:'Leg',vi:'Chân'},{en:'Finger',vi:'Ngón tay'},{en:'Hair',vi:'Tóc'},{en:'Tooth',vi:'Răng'}
-                    ],
-                    7: [
-                        {en:'Shirt',vi:'Áo sơ mi'},{en:'T-Shirt',vi:'Áo thun'},{en:'Pants',vi:'Quần dài'},{en:'Hat',vi:'Mũ/Nón'},
-                        {en:'Shoes',vi:'Giày'},{en:'Socks',vi:'Tất/Vớ'},{en:'Skirt',vi:'Chân váy'},{en:'Dress',vi:'Váy liền'},
-                        {en:'Coat',vi:'Áo khoác'},{en:'Jacket',vi:'Áo ấm'},{en:'Cap',vi:'Mũ lưỡi trai'},{en:'Belt',vi:'Thắt lưng'}
-                    ],
-                    8: [
-                        {en:'Rice',vi:'Cơm'},{en:'Meat',vi:'Thịt'},{en:'Fish',vi:'Cá'},{en:'Soup',vi:'Canh/Súp'},
-                        {en:'Egg',vi:'Trứng'},{en:'Cake',vi:'Bánh ngọt'},{en:'Juice',vi:'Nước ép'},{en:'Tea',vi:'Trà'},
-                        {en:'Coffee',vi:'Cà phê'},{en:'Ice Cream',vi:'Kem'},{en:'Pizza',vi:'Bánh Pizza'},{en:'Noodles',vi:'Mì'}
-                    ],
-                    9: [
-                        {en:'Car',vi:'Ô tô'},{en:'Bus',vi:'Xe buýt'},{en:'Bike',vi:'Xe đạp'},{en:'Motorbike',vi:'Xe máy'},
-                        {en:'Train',vi:'Tàu hỏa'},{en:'Plane',vi:'Máy bay'},{en:'Ship',vi:'Tàu thủy'},{en:'Boat',vi:'Thuyền'},
-                        {en:'Taxi',vi:'Xe Taxi'},{en:'Truck',vi:'Xe tải'},{en:'Subway',vi:'Tàu điện ngầm'},{en:'Helicopter',vi:'Trực thăng'}
-                    ],
-                    10: [
-                        {en:'Happy',vi:'Vui vẻ'},{en:'Sad',vi:'Buồn'},{en:'Angry',vi:'Giận dữ'},{en:'Tired',vi:'Mệt mỏi'},
-                        {en:'Scared',vi:'Sợ hãi'},{en:'Brave',vi:'Dũng cảm'},{en:'Kind',vi:'Tốt bụng'},{en:'Smart',vi:'Thông minh'},
-                        {en:'Funny',vi:'Hài hước'},{en:'Calm',vi:'Bình tĩnh'},{en:'Excited',vi:'Hào hứng'},{en:'Proud',vi:'Tự hào'}
-                    ]
-                };
-
-                this.levelNames = {
-                    1: '1. Trái cây', 2: '2. Màu sắc', 3: '3. Động vật', 4: '4. Học tập', 5: '5. Gia đình',
-                    6: '6. Cơ thể', 7: '7. Quần áo', 8: '8. Ẩm thực', 9: '9. Giao thông', 10: '10. Cảm xúc'
-                };
-
                 this.curLvl = 1; this.flipped = []; this.matched = 0; this.moves = 0; this.sec = 0;
                 this.dom = {
                     board: document.getElementById('board'), lvl: document.getElementById('lvl'), time: document.getElementById('time'),
@@ -246,23 +513,19 @@
             init() {
                 document.getElementById('excel-file').onchange = (e) => this.readExcel(e);
                 document.getElementById('reset-btn').onclick = () => this.start(this.curLvl);
-                
                 document.getElementById('btn-continue').onclick = () => {
                     this.dom.modal.classList.remove('active');
-                    const nextLvl = this.levels[this.curLvl + 1] ? this.curLvl + 1 : 1;
+                    const nextLvl = sharedLevels[this.curLvl + 1] ? this.curLvl + 1 : 1;
                     this.start(nextLvl);
                 };
-
                 document.getElementById('btn-replay').onclick = () => {
                     this.dom.modal.classList.remove('active');
                     this.start(this.curLvl);
                 };
-
                 document.getElementById('btn-review').onclick = () => {
                     this.dom.modal.classList.remove('active');
                     this.arrangeReviewMode();
                 };
-
                 this.dom.select.onchange = (e) => this.start(+e.target.value);
                 this.renderSelect(); this.start(1);
             }
@@ -273,39 +536,36 @@
                 r.onload = (ex) => {
                     const wb = XLSX.read(new Uint8Array(ex.target.result), {type:'array'});
                     const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                    this.levels = {}; this.levelNames = {};
+                    sharedLevels = {}; sharedLevelNames = {};
                     json.forEach(row => {
                         const l = row['Màn chơi (Level)'] || row['Level'] || 1;
                         const en = row['Từ Tiếng Anh (English)'] || row['English'];
                         const vi = row['Nghĩa Tiếng Việt (Vietnamese)'] || row['Vietnamese'];
                         if (en && vi) { 
-                            (this.levels[l] = this.levels[l] || []).push({en: String(en).trim(), vi: String(vi).trim()}); 
-                            this.levelNames[l] = `Màn ${l}`;
+                            (sharedLevels[l] = sharedLevels[l] || []).push({en: String(en).trim(), vi: String(vi).trim()}); 
+                            sharedLevelNames[l] = `Màn ${l}`;
                         }
                     });
-                    this.renderSelect(); this.start(+Object.keys(this.levels)[0]);
+                    this.renderSelect(); this.start(+Object.keys(sharedLevels)[0]);
                 };
                 r.readAsArrayBuffer(file);
             }
 
             renderSelect() {
-                this.dom.select.innerHTML = Object.keys(this.levels).map(l => `<option value="${l}">${this.levelNames[l] || 'Màn ' + l}</option>`).join('');
+                this.dom.select.innerHTML = Object.keys(sharedLevels).map(l => `<option value="${l}">${sharedLevelNames[l] || 'Màn ' + l}</option>`).join('');
             }
 
             start(lvl) {
                 this.curLvl = lvl; this.dom.lvl.textContent = lvl; this.dom.select.value = lvl;
                 this.dom.board.classList.remove('review-mode');
-
-                let pairs = this.levels[lvl] || [];
+                let pairs = sharedLevels[lvl] || [];
                 while (pairs.length < 12 && pairs.length > 0) pairs = pairs.concat(pairs);
                 pairs = pairs.slice(0, 12);
-
                 this.cardsData = pairs;
                 this.cards = pairs.flatMap((p, i) => [
                     { id: i, text: p.en, type: 'EN' },
                     { id: i, text: p.vi, type: 'VI' }
                 ]).sort(() => Math.random() - 0.5);
-
                 this.reset(); this.render();
             }
 
@@ -322,9 +582,7 @@
                 this.dom.board.innerHTML = '';
                 this.cards.forEach((c) => {
                     const el = document.createElement('div');
-                    el.className = 'card';
-                    el.dataset.id = c.id;
-                    el.dataset.type = c.type;
+                    el.className = 'card'; el.dataset.id = c.id; el.dataset.type = c.type;
                     el.innerHTML = `
                         <div class="face front"></div>
                         <div class="face back">
@@ -337,14 +595,10 @@
             }
 
             flip(el, data) {
-                // Nếu thẻ đã matched và là thẻ Tiếng Anh => Phát âm từ
                 if (el.classList.contains('matched')) {
-                    if (data.type === 'EN') {
-                        speakWord(data.text);
-                    }
+                    if (data.type === 'EN') speakWord(data.text);
                     return;
                 }
-
                 if (this.lock || el.classList.contains('flipped')) return;
                 el.classList.add('flipped'); playSnd(400);
                 this.flipped.push({el, data});
@@ -356,26 +610,13 @@
 
                     if (isMatch) {
                         setTimeout(() => {
-                            // Cập nhật nội dung hiển thị sau khi ghép đúng
                             const enCard = c1.data.type === 'EN' ? c1 : c2;
                             const viCard = c1.data.type === 'VI' ? c1 : c2;
+                            enCard.el.querySelector('.back').innerHTML = `<div class="type">ENGLISH</div><div class="text" style="color:#fef08a">${enCard.data.text}</div><div class="speaker-icon">🔊 Chạm nghe</div>`;
+                            viCard.el.querySelector('.back').innerHTML = `<div class="type">TIẾNG VIỆT</div><div class="text" style="color:#fef08a">${viCard.data.text}</div><small style="font-size:0.55rem; color:#a7f3d0;">Bé giỏi quá ⭐</small>`;
 
-                            enCard.el.querySelector('.back').innerHTML = `
-                                <div class="type">ENGLISH</div>
-                                <div class="text" style="color:#fef08a">${enCard.data.text}</div>
-                                <div class="speaker-icon">🔊 Chạm nghe</div>`;
-
-                            viCard.el.querySelector('.back').innerHTML = `
-                                <div class="type">TIẾNG VIỆT</div>
-                                <div class="text" style="color:#fef08a">${viCard.data.text}</div>
-                                <small style="font-size:0.55rem; color:#a7f3d0;">Bé giỏi quá ⭐</small>`;
-
-                            c1.el.classList.add('matched'); 
-                            c2.el.classList.add('matched');
-                            
-                            // Tự động phát âm từ tiếng Anh ngay khi lật đúng Cặp
+                            c1.el.classList.add('matched'); c2.el.classList.add('matched');
                             speakWord(enCard.data.text);
-
                             this.matched++; this.dom.score.textContent = `${this.matched}/12`;
                             this.flipped = []; this.lock = false;
                             if (this.matched === 12) setTimeout(() => this.win(), 800);
@@ -400,37 +641,296 @@
             arrangeReviewMode() {
                 this.dom.board.classList.add('review-mode');
                 this.dom.board.innerHTML = '';
-
                 this.cardsData.forEach(pair => {
                     const enEl = document.createElement('div');
-                    enEl.className = 'card flipped matched';
-                    enEl.setAttribute('data-type', 'EN');
-                    enEl.style.cursor = 'pointer';
-                    enEl.innerHTML = `
-                        <div class="face back">
-                            <div class="type">ENGLISH</div>
-                            <div class="text">${pair.en}</div>
-                            <div class="speaker-btn" title="Nghe giọng David">🔊 Nghe</div>
-                        </div>`;
-                    
+                    enEl.className = 'card flipped matched'; enEl.setAttribute('data-type', 'EN');
+                    enEl.innerHTML = `<div class="face back"><div class="type">ENGLISH</div><div class="text">${pair.en}</div><div class="speaker-icon">🔊 Nghe</div></div>`;
                     enEl.onclick = () => speakWord(pair.en);
 
                     const viEl = document.createElement('div');
                     viEl.className = 'card flipped matched';
-                    viEl.setAttribute('data-type', 'VI');
-                    viEl.innerHTML = `
-                        <div class="face back">
-                            <div class="type">TIẾNG VIỆT</div>
-                            <div class="text">${pair.vi}</div>
-                        </div>`;
-
-                    this.dom.board.appendChild(enEl);
-                    this.dom.board.appendChild(viEl);
+                    viEl.innerHTML = `<div class="face back"><div class="type">TIẾNG VIỆT</div><div class="text">${pair.vi}</div></div>`;
+                    this.dom.board.appendChild(enEl); this.dom.board.appendChild(viEl);
                 });
             }
         }
 
-        window.onload = () => new Game();
+        // ==========================================
+        // GAME 2: ĐIỀN TỪ VÀO CHỖ TRỐNG
+        // ==========================================
+        const g2Data = {
+            1: {
+                title: "Cấp 1: Thêm -s/es hoặc -ing cơ bản",
+                questions: [
+                    { sentence: "She _____ (play) badminton every afternoon.", hint: "Thì Hiện Tại Đơn (Diễn tả thói quen)", options: ["plays", "playing", "played", "play"], answer: 0 },
+                    { sentence: "They are _____ (read) books in the library.", hint: "Thì Hiện Tại Tiếp Diễn (Hành động đang xảy ra)", options: ["reads", "reading", "readed", "read"], answer: 1 }
+                ]
+            },
+            2: {
+                title: "Cấp 2: Thêm -es đuôi o, s, ch, x, sh",
+                questions: [
+                    { sentence: "He _____ (watch) TV before going to bed.", hint: "Thì Hiện Tại Đơn (Động từ tận cùng là -ch)", options: ["watchs", "watches", "watching", "watched"], answer: 1 },
+                    { sentence: "My mother _____ (go) to the market every Sunday.", hint: "Thì Hiện Tại Đơn (Động từ tận cùng là -o)", options: ["goes", "gos", "going", "went"], answer: 0 }
+                ]
+            },
+            3: {
+                title: "Cấp 3: Bỏ -e câm khi thêm -ing",
+                questions: [
+                    { sentence: "Look! She is _____ (make) a birthday cake.", hint: "Thì Hiện Tại Tiếp Diễn (Bỏ -e câm + ing)", options: ["makeing", "making", "makes", "made"], answer: 1 },
+                    { sentence: "We are _____ (write) a letter to our friend.", hint: "Thì Hiện Tại Tiếp Diễn (Bỏ -e câm + ing)", options: ["writing", "writeing", "writes", "wrote"], answer: 0 }
+                ]
+            },
+            4: {
+                title: "Cấp 4: Đổi -y thành -ies / -ied",
+                questions: [
+                    { sentence: "The baby _____ (cry) every night.", hint: "Thì Hiện Tại Đơn (Đổi -y thành -ies)", options: ["crys", "cries", "crying", "cried"], answer: 1 },
+                    { sentence: "Yesterday, he _____ (study) for the exam.", hint: "Thì Quá Khứ Đơn (Đổi -y thành -ied)", options: ["studies", "studying", "studied", "studyed"], answer: 2 }
+                ]
+            },
+            5: {
+                title: "Cấp 5: Gấp đôi phụ âm cuối",
+                questions: [
+                    { sentence: "Look! The boy is _____ (run) very fast.", hint: "Thì Hiện Tại Tiếp Diễn (Gấp đôi phụ âm n)", options: ["runing", "running", "runs", "ran"], answer: 1 },
+                    { sentence: "The bus _____ (stop) a minute ago.", hint: "Thì Quá Khứ Đơn (Gấp đôi phụ âm p + ed)", options: ["stoped", "stopped", "stops", "stopping"], answer: 1 }
+                ]
+            },
+            6: {
+                title: "Cấp 6: Bất quy tắc V1 = V2 = V3",
+                questions: [
+                    { sentence: "He _____ (cut) the cake into 4 pieces yesterday.", hint: "Thì Quá Khứ Đơn (Giữ nguyên dạng Cut)", options: ["cutted", "cut", "cuts", "cutting"], answer: 1 }
+                ]
+            },
+            7: {
+                title: "Cấp 7: Bất quy tắc V2 = V3",
+                questions: [
+                    { sentence: "I _____ (buy) a new hat last week.", hint: "Thì Quá Khứ Đơn (Dạng V2 của Buy là Bought)", options: ["buyed", "buys", "bought", "buying"], answer: 2 }
+                ]
+            },
+            8: {
+                title: "Cấp 8: Bất quy tắc V1 ≠ V2 ≠ V3",
+                questions: [
+                    { sentence: "She _____ (go) to Paris three days ago.", hint: "Thì Quá Khứ Đơn (Dạng V2 của Go là Went)", options: ["goed", "went", "gone", "goes"], answer: 1 }
+                ]
+            },
+            9: {
+                title: "Cấp 9: Động từ phát âm đặc biệt",
+                questions: [
+                    { sentence: "He _____ (read) two books last night.", hint: "Thì Quá Khứ Đơn (Viết giống V1 nhưng đọc là /red/)", options: ["readed", "read", "reads", "reading"], answer: 1 }
+                ]
+            },
+            10: {
+                title: "Cấp 10: Đa nghĩa & Dễ nhầm lẫn",
+                questions: [
+                    { sentence: "He was so tired that he _____ (lie) down on the grass.", hint: "Thì Quá Khứ Đơn (Từ Lie = nằm -> Quá khứ là Lay)", options: ["lied", "lay", "lain", "lying"], answer: 1 }
+                ]
+            }
+        };
+
+        let g2CurrentLvl = 1;
+        let g2CurrentQIdx = 0;
+
+        function showG2LevelSelect() {
+            document.getElementById('g2-select-screen').style.display = 'flex';
+            document.getElementById('g2-play-screen').classList.remove('active');
+            
+            const grid = document.getElementById('g2-level-grid');
+            grid.innerHTML = '';
+            
+            for(let i=1; i<=10; i++) {
+                const info = g2Data[i] || { title: `Cấp ${i}` };
+                const btn = document.createElement('button');
+                btn.className = 'g2-level-btn';
+                btn.innerHTML = `<b style="color:var(--accent)">Cấp ${i}</b><br><small style="color:#cbd5e1">${info.title}</small>`;
+                btn.onclick = () => startG2Game(i);
+                grid.appendChild(btn);
+            }
+        }
+
+        function startG2Game(level) {
+            g2CurrentLvl = level;
+            g2CurrentQIdx = 0;
+            document.getElementById('g2-select-screen').style.display = 'none';
+            document.getElementById('g2-play-screen').classList.add('active');
+            loadG2Question();
+        }
+
+        function loadG2Question() {
+            const lvlObj = g2Data[g2CurrentLvl];
+            if (!lvlObj || !lvlObj.questions || g2CurrentQIdx >= lvlObj.questions.length) {
+                alert(`Chúc mừng bé đã hoàn thành các câu hỏi của ${lvlObj.title}!`);
+                showG2LevelSelect();
+                return;
+            }
+
+            const q = lvlObj.questions[g2CurrentQIdx];
+            document.getElementById('g2-level-title').textContent = lvlObj.title;
+            document.getElementById('g2-progress').textContent = `Câu ${g2CurrentQIdx + 1}/${lvlObj.questions.length}`;
+            document.getElementById('g2-hint').innerHTML = `💡 <b>Gợi ý thì:</b> ${q.hint}`;
+            
+            const formattedSentence = q.sentence.replace('_____', '<span class="g2-blank">_______</span>');
+            document.getElementById('g2-sentence').innerHTML = formattedSentence;
+
+            const optGrid = document.getElementById('g2-options');
+            optGrid.innerHTML = '';
+            
+            q.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'g2-opt-btn';
+                btn.textContent = opt;
+                btn.onclick = () => checkG2Answer(btn, idx === q.answer);
+                optGrid.appendChild(btn);
+            });
+        }
+
+        function checkG2Answer(btn, isCorrect) {
+            if (isCorrect) {
+                btn.classList.add('correct');
+                playSnd(600);
+                setTimeout(() => {
+                    g2CurrentQIdx++;
+                    loadG2Question();
+                }, 800);
+            } else {
+                btn.classList.add('incorrect');
+                playSnd(150, 'sawtooth');
+            }
+        }
+
+        // ==========================================
+        // GAME 3: ĐOÁN TỪ TIẾNG ANH THEO CHỦ ĐỀ
+        // ==========================================
+        let g3CurrentLvl = 1;
+        let g3List = [];
+        let g3Idx = 0;
+        let g3Score = 0;
+
+        function initG3Select() {
+            const select = document.getElementById('g3-lvl-select');
+            select.innerHTML = Object.keys(sharedLevels).map(l => `<option value="${l}">${sharedLevelNames[l] || 'Chủ đề ' + l}</option>`).join('');
+            startG3Game(+select.value || 1);
+        }
+
+        function makeWordMask(word) {
+            if (word.length <= 2) return word[0] + '..';
+            const first = word[0];
+            const last = word[word.length - 1];
+            return first + '..' + last;
+        }
+
+        function startG3Game(lvl) {
+            g3CurrentLvl = lvl;
+            const originalList = sharedLevels[lvl] || [];
+            // Đảo từ ngẫu nhiên mỗi lần bắt đầu
+            g3List = [...originalList].sort(() => Math.random() - 0.5);
+            g3Idx = 0;
+            g3Score = 0;
+            document.getElementById('g3-score').textContent = g3Score;
+            
+            const inp = document.getElementById('g3-answer');
+            inp.onkeyup = (e) => { if (e.key === 'Enter') checkG3Answer(); };
+
+            loadG3Question();
+        }
+
+        function loadG3Question() {
+            if (g3Idx >= g3List.length) {
+                alert(`🎉 Tuyệt vời! Bé đã xuất sắc điền đúng toàn bộ từ vựng chủ đề này! Điểm: ${g3Score}/${g3List.length}`);
+                switchScreen('lobby');
+                return;
+            }
+
+            const item = g3List[g3Idx];
+            const masked = makeWordMask(item.en);
+            
+            // Lược bỏ hoàn toàn số câu "Câu X:"
+            document.getElementById('g3-question').innerHTML = `${item.vi} = <span style="color:var(--accent); font-size: 1.6rem;">${masked}</span>`;
+            
+            const inp = document.getElementById('g3-answer');
+            inp.value = '';
+            inp.focus();
+        }
+
+        function checkG3Answer() {
+            const inp = document.getElementById('g3-answer');
+            const userAns = inp.value.trim().toLowerCase();
+            const correctAns = g3List[g3Idx].en.toLowerCase();
+
+            if (userAns === correctAns) {
+                playSnd(600);
+                speakWord(correctAns);
+                g3Score++;
+                g3Idx++;
+                document.getElementById('g3-score').textContent = g3Score;
+                loadG3Question();
+            } else {
+                playSnd(150, 'sawtooth');
+                inp.style.borderColor = 'var(--danger)';
+                setTimeout(() => { inp.style.borderColor = 'rgba(255,255,255,0.2)'; }, 500);
+            }
+        }
+
+        // ==========================================
+        // GAME 4: CÁC THỂ CỦA TO BE
+        // ==========================================
+        const formsQuestions = [
+            // Thể Khẳng định
+            { q: "[Khẳng định] She ______ a very smart student.", options: ["is", "isn't", "are", "am"], answer: 0 },
+            { q: "[Khẳng định] They ______ at the zoo yesterday.", options: ["were", "weren't", "was", "is"], answer: 0 },
+            
+            // Thể Phủ định
+            { q: "[Phủ định] He ______ hungry right now. (Không đói)", options: ["is", "isn't", "aren't", "am not"], answer: 1 },
+            { q: "[Phủ định] We ______ late for school yesterday.", options: ["were", "weren't", "isn't", "wasn't"], answer: 1 },
+            { q: "[Phủ định] I ______ tired today.", options: ["is not", "are not", "am not", "not am"], answer: 2 },
+
+            // Thể Nghi vấn (Câu hỏi)
+            { q: "[Nghi vấn] ______ you ready for the game?", options: ["Is", "Am", "Are", "Was"], answer: 2 },
+            { q: "[Nghi vấn] ______ he at home last night?", options: ["Was", "Were", "Is", "Are"], answer: 0 },
+            { q: "[Nghi vấn & Trả lời] 'Are they students?' - 'Yes, they ______.'", options: ["are", "is", "were", "do"], answer: 0 },
+            { q: "[Nghi vấn & Trả lời] 'Was she happy?' - 'No, she ______.'", options: ["was", "wasn't", "isn't", "doesn't"], answer: 1 },
+            { q: "[Chuyển thể] Chuyển câu 'He is a doctor' sang thể PHỦ ĐỊNH:", options: ["He is not a doctor.", "Is he a doctor?", "He not a doctor.", "He isn't doctor."], answer: 0 }
+        ];
+
+        let g4Idx = 0, g4Score = 0;
+
+        function startFormsGame() {
+            g4Idx = 0; g4Score = 0;
+            document.getElementById('g4-score').textContent = g4Score;
+            loadFormsQ();
+        }
+
+        function loadFormsQ() {
+            if (g4Idx >= formsQuestions.length) {
+                alert(`🎉 Tuyệt vời! Bé đã nắm vững 3 thể Khẳng định, Phủ định và Nghi vấn của To Be! Điểm số: ${g4Score}/${formsQuestions.length}`);
+                switchScreen('lobby');
+                return;
+            }
+            const cur = formsQuestions[g4Idx];
+            document.getElementById('g4-question').textContent = cur.q;
+            const optDiv = document.getElementById('g4-options');
+            optDiv.innerHTML = '';
+            cur.options.forEach((opt, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'quiz-btn';
+                btn.textContent = `${String.fromCharCode(65 + i)}. ${opt}`;
+                btn.onclick = () => checkQuiz(btn, i === cur.answer, () => { 
+                    g4Idx++; 
+                    g4Score++; 
+                    document.getElementById('g4-score').textContent = g4Score; 
+                    loadFormsQ(); 
+                });
+                optDiv.appendChild(btn);
+            });
+        }
+
+        // Helper kiểm tra đáp án chung
+        function checkQuiz(btn, isCorrect, nextFn) {
+            if (isCorrect) {
+                btn.classList.add('correct'); playSnd(600);
+                setTimeout(nextFn, 800);
+            } else {
+                btn.classList.add('incorrect'); playSnd(150, 'sawtooth');
+            }
+        }
     </script>
 </body>
 </html>
